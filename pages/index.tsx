@@ -2,7 +2,7 @@ import { ConnectWallet, useConnectedWallet } from "@thirdweb-dev/react";
 import lighthouse from "@lighthouse-web3/sdk";
 import styles from "../styles/Home.module.css";
 import { NextPage } from "next";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type AuthSignature = {
   publicKey: string;
@@ -11,11 +11,17 @@ type AuthSignature = {
 
 const Home: NextPage = () => {
   const cid = process.env.NEXT_PUBLIC_CID_TO_DECRYPT as string;
-
   const wallet = useConnectedWallet();
   const [decryptedContentUrl, setDecryptedContentUrl] = useState<
     string | undefined
   >(undefined);
+
+  useEffect(() => {
+    if (!wallet) {
+      setDecryptedContentUrl(undefined);
+      return;
+    }
+  }, [wallet]);
 
   const handleSignAndDecryptContent = async () => {
     if (!wallet) {
@@ -41,6 +47,7 @@ const Home: NextPage = () => {
     } catch (error) {
       console.error(error);
       alert(`We could not verify user has access to view this content`);
+      setDecryptedContentUrl(undefined);
     }
   };
 
