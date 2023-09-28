@@ -1,5 +1,10 @@
-import { ConnectWallet, useConnectedWallet } from "@thirdweb-dev/react";
+import {
+  ConnectWallet,
+  UserWallet,
+  useConnectedWallet,
+} from "@thirdweb-dev/react";
 import lighthouse from "@lighthouse-web3/sdk";
+import kavach from "@lighthouse-web3/kavach";
 import styles from "../styles/Home.module.css";
 import { NextPage } from "next";
 import { useEffect, useState } from "react";
@@ -30,17 +35,7 @@ const Home: NextPage = () => {
     try {
       const address = await wallet.getAddress();
 
-      const messageRequested = (await lighthouse.getAuthMessage(address)).data
-        .message;
-
-      if (!messageRequested) throw new Error("Could not get auth message");
-
-      const signedMessage = await wallet.sign(messageRequested);
-
-      const authSig: AuthSignature = {
-        publicKey: address,
-        signedMessage,
-      };
+      const authSig: AuthSignature = await getSignature(address, wallet);
 
       const contentUrl = await decryptContent(cid, authSig);
       setDecryptedContentUrl(contentUrl);
@@ -50,6 +45,44 @@ const Home: NextPage = () => {
       setDecryptedContentUrl(undefined);
     }
   };
+
+  async function getSignature(address: string, wallet: UserWallet) {
+    const authMessage = await kavach.getAuthMessage(address);
+    const signedMessage = await wallet.sign(authMessage.message);
+
+    // TODO: Figure out how to do with SDK
+    // const { JWT, error } = await kavach.getJWT(address, signedMessage);
+    // if (error) {
+    //   throw new Error(error.toString());
+    // }
+    // if (!JWT) {
+    //   throw new Error("JWT not found");
+    // }
+    const { token } = await fetch(
+      "https://encryption.lighthouse.storage/api/message/get-jwt",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          address,
+          signature: signedMessage,
+          chain: "mumbai",
+        }),
+      }
+    ).then((res) => res.json());
+
+    if (!token) throw new Error("Could not get JWT");
+
+    const JWT = token;
+
+    const authSig: AuthSignature = {
+      publicKey: address,
+      signedMessage: JWT,
+    };
+    return authSig;
+  }
 
   const decryptContent = async (
     cid: string,
